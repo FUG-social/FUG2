@@ -59,7 +59,12 @@ class TursoDB {
             $this->logger->database('ERROR', 'Curl error', ['msg' => curl_error($ch)]);
             return false;
         }
-        curl_close($ch);
+
+        // FIX: Only call curl_close if it's a legacy resource (PHP 7). 
+        // In PHP 8+, it's an object and cleans itself up, avoiding the deprecation warning.
+        if (is_resource($ch)) {
+            curl_close($ch);
+        }
 
         if ($httpCode >= 400) {
             $this->logger->database('ERROR', 'Database HTTP Error', ['code' => $httpCode, 'res' => $response]);

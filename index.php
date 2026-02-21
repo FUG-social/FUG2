@@ -1,9 +1,5 @@
 <?php
-
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
-
+ob_start(); // FIX: Output Buffering prevents visual errors from breaking session headers
 session_start();
 require_once 'db.php';
 $db = new TursoDB();
@@ -21,10 +17,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $_SESSION['user_interests'] = $users[0]['interests'] ?? '';
             session_regenerate_id(true);
         }
-        header("Location: index.php"); exit;
+        header("Location: index.php"); 
+        exit;
     } elseif ($_POST['action'] === 'logout') {
         session_destroy();
-        header("Location: index.php"); exit;
+        header("Location: index.php"); 
+        exit;
     }
 }
 $isLoggedIn = isset($_SESSION['user_id']);
