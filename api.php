@@ -14,35 +14,19 @@ $realtimeStore = RealtimeStore::getInstance();
 $db = new TursoDB();
 $db->autoSetup();
 
-// --- SMART OBFUSCATION DECODER START ---
-$rawInput = file_get_contents('php://input');
-$input = json_decode($rawInput, true);
+// NEW: Interceptor for the Encoded Workaround
+$rawInput = json_decode(file_get_contents('php://input'), true) ?? $_POST;
 
-// If standard JSON fails, attempt to decrypt the custom secure payload
-if (!$input && !empty($rawInput) && isset($_SESSION['api_key'])) {
-    $decoded64 = base64_decode($rawInput);
-    if ($decoded64 !== false) {
-        $key = $_SESSION['api_key'];
-        $decryptedStr = '';
-        $keyLen = strlen($key);
-        $dataLen = strlen($decoded64);
-        
-        // Reverse XOR Cipher
-        for ($i = 0; $i < $dataLen; $i++) {
-            $decryptedStr .= chr(ord($decoded64[$i]) ^ ord($key[$i % $keyLen]));
-        }
-        
-        $decodedJson = json_decode($decryptedStr, true);
-        if ($decodedJson !== null) {
-            $input = $decodedJson;
-        }
-    }
+if (isset($rawInput['_encoded_payload'])) {
+    // Decode the Base64 payload back into JSON
+    $decodedJson = base64_decode($rawInput['_encoded_payload']);
+    $input = json_decode($decodedJson, true) ?? [];
+} else {
+    // Fallback keeps old code safe if raw JSON is ever sent
+    $input = $rawInput;
 }
 
-// Fallback to standard POST for initial unauthenticated calls
-$input = $input ?? $_POST;
 $action = $input['action'] ?? '';
-// --- SMART OBFUSCATION DECODER END ---
 
 if (!$action) {
     echo json_encode(['status' => 'error', 'message' => 'No action']);

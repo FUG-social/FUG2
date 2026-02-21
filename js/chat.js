@@ -1,6 +1,10 @@
 const Chat = {
-    pollInterval: null,
-    unreadInterval: null,
+    unreadInterval: null, 
+    
+    // --- Local Cache Helpers ---
+    getCacheKey: (userId) => `chat_history_${State.userId}_${userId}`,
+    getCache: (userId) => JSON.parse(localStorage.getItem(Chat.getCacheKey(userId)) || '[]'),
+    setCache: (userId, data) => localStorage.setItem(Chat.getCacheKey(userId), JSON.stringify(data)),
     
     renderUserList: () => {
         const list = document.getElementById('chat-list');
@@ -13,100 +17,77 @@ const Chat = {
         `).join('') || "No users found.";
     },
     
-    open: (id, name) => {
+    open: async (id, name) => {
         State.activeChatId = id;
         document.getElementById('chat-room-name').innerText = name;
         document.getElementById('chat-list').classList.add('hidden');
         document.getElementById('chat-room').classList.remove('hidden');
         
-        // Force navigate to Chat tab
         document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
         document.getElementById('view-chats').classList.add('active');
         document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
         
-        // CSR CACHE: Instantly load history from LocalStorage
-        const area = document.getElementById('chat-messages');
-        area.innerHTML = ''; // Clear prior view context
+        // 1. PURE CSR: Render immediately from Local Cache. Zero latency.
+        const cachedMessages = Chat.getCache(id);
+        Chat.renderMessagesHTML(cachedMessages);
         
-        const cacheKey = `fug_chat_${State.userId}_${State.activeChatId}`;
-        const cachedData = JSON.parse(localStorage.getItem(cacheKey) || '[]');
-        
-        if (cachedData.length > 0) {
-            Chat.renderMessagesToDOM(cachedData, area, true);
+        // 2. "AT ONCE" API INVOLVEMENT: Sync with database exactly ONCE upon opening. 
+        // No background looping for active chat.
+        const res = await State.api('get_messages', { other_user_id: id });
+        if (res.status === 'success') {
+            Chat.setCache(id, res.data);
+            Chat.renderMessagesHTML(res.data);
         }
-
-        if (Chat.pollInterval) clearInterval(Chat.pollInterval);
-        Chat.pollInterval = setInterval(Chat.loadMessages, 1500);
-        Chat.loadMessages();
     },
     
     close: () => {
         State.activeChatId = null;
         document.getElementById('chat-room').classList.add('hidden');
         document.getElementById('chat-list').classList.remove('hidden');
-        if (Chat.pollInterval) clearInterval(Chat.pollInterval);
     },
     
-    loadMessages: async () => {
-        if (!State.activeChatId) return;
-        
-        const res = await State.api('get_messages', { other_user_id: State.activeChatId });
-        if (res.status === 'success') {
-            const area = document.getElementById('chat-messages');
-            const cacheKey = `fug_chat_${State.userId}_${State.activeChatId}`;
-            let cachedData = JSON.parse(localStorage.getItem(cacheKey) || '[]');
-            
-            const newMessages = [];
-            const serverMessages = res.data;
-            const cachedIds = new Set(cachedData.map(m => m.id));
-            
-            // Check for messages the server has that aren't in local storage yet
-            serverMessages.forEach(msg => {
-                if (!cachedIds.has(msg.id)) {
-                    newMessages.push(msg);
-                    cachedData.push(msg);
-                }
-            });
-            
-            if (newMessages.length > 0) {
-                // Ensure array order integrity
-                cachedData.sort((a, b) => parseInt(a.id) - parseInt(b.id));
-                // Cap localStorage size so browser doesn't choke over time
-                if (cachedData.length > 200) cachedData = cachedData.slice(-200);
-                
-                localStorage.setItem(cacheKey, JSON.stringify(cachedData));
-                
-                // Only inject the NEW DOM nodes (No flickering)
-                Chat.renderMessagesToDOM(newMessages, area, false);
-            }
+    // Abstracted Rendering Logic for CSR
+    renderMessagesHTML: (messages) => {
+        const area = document.getElementById('chat-messages');
+        if (!messages || messages.length === 0) {
+            area.innerHTML = '<div style="text-align:center; color:#aaa; margin-top:20px;">No messages yet.</div>';
+            return;
         }
-    },
 
-    // Helper CSR logic to inject nodes safely 
-    renderMessagesToDOM: (messages, container, isFullLoad) => {
-        const atBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50;
+        const html = messages.map(m => `
+            <div class="msg-bubble ${m.sender_id == State.userId ? 'msg-sent' : 'msg-received'}">
+                ${m.body}
+            </div>
+        `).join('');
         
-        messages.forEach(m => {
-            const div = document.createElement('div');
-            div.className = `msg-bubble ${m.sender_id == State.userId ? 'msg-sent' : 'msg-received'}`;
-            div.innerText = m.body; // innerText inherently blocks XSS injections
-            container.appendChild(div);
-        });
-
-        // Smart auto-scroll logic
-        if (atBottom || isFullLoad || container.innerHTML === '') {
-            container.scrollTop = container.scrollHeight;
+        // Only update DOM if changes occurred (prevents blinking)
+        if (area.innerHTML.replace(/\s+/g, '') !== html.replace(/\s+/g, '')) {
+            const atBottom = area.scrollHeight - area.scrollTop <= area.clientHeight + 50;
+            area.innerHTML = html;
+            if (atBottom || area.innerHTML === '') area.scrollTop = area.scrollHeight;
         }
     },
     
     send: async () => {
         const input = document.getElementById('chat-input');
         const body = input.value.trim();
-        if (!body || !State.activeChatId) return;
+        const receiverId = State.activeChatId;
+        if (!body || !receiverId) return;
         
         input.value = '';
-        await State.api('send_message', { receiver_id: State.activeChatId, body });
-        Chat.loadMessages(); // Force immediate refresh
+        
+        // 1. PURE CSR: Push to local cache and render instantly. NO waiting for PHP.
+        const localData = Chat.getCache(receiverId);
+        localData.push({
+            sender_id: State.userId,
+            receiver_id: receiverId,
+            body: body
+        });
+        Chat.setCache(receiverId, localData);
+        Chat.renderMessagesHTML(localData);
+        
+        // 2. "AT ONCE" API INVOLVEMENT: Send to database silently in the background once.
+        await State.api('send_message', { receiver_id: receiverId, body });
     },
     
     startUnreadPolling: () => {

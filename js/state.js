@@ -1,6 +1,5 @@
 const State = {
     userId: document.querySelector('meta[name="current-user-id"]')?.content,
-    apiKey: document.querySelector('meta[name="api-key"]')?.content,
     lat: 29.3956, 
     lng: 71.6836,
     users: [],
@@ -8,29 +7,21 @@ const State = {
 
     api: async (action, data = {}) => {
         data.action = action;
-        let payload, headers;
-
-        // SECURE PAYLOAD ENCODING (Only works if logged in & key exists)
-        if (State.apiKey) {
-            const str = JSON.stringify(data);
-            let encoded = '';
-            // Forward XOR Cipher
-            for(let i = 0; i < str.length; i++) {
-                encoded += String.fromCharCode(str.charCodeAt(i) ^ State.apiKey.charCodeAt(i % State.apiKey.length));
-            }
-            payload = btoa(encoded); // Base64 safe transport
-            headers = { 'Content-Type': 'text/plain' }; // Mask as plain text to avoid auto-parsers
-        } else {
-            // Standard JSON fallback
-            payload = JSON.stringify(data);
-            headers = { 'Content-Type': 'application/json' };
-        }
+        
+        // WORKAROUND: Encode the payload so it's not exposed as raw JSON in the Network tab.
+        const rawJsonString = JSON.stringify(data);
+        // Encode securely handling Unicode characters
+        const encodedPayload = btoa(unescape(encodeURIComponent(rawJsonString)));
+        
+        const secureData = {
+            _encoded_payload: encodedPayload
+        };
 
         try {
             const res = await fetch('api.php', {
                 method: 'POST',
-                headers: headers,
-                body: payload
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(secureData) // Sending the encoded wrapper
             });
             return await res.json();
         } catch (e) { 
