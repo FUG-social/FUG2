@@ -1,0 +1,130 @@
+[
+  {
+    "path": "api.php",
+    "size": 1268,
+    "hash": "69e6702d08933aae4129c4d8e8ee2beb832a161a82d9bc618d64c7146eeda030",
+    "status": "OK",
+    "method": "Context Scan (Line -1)",
+    "confidence": 0.83
+  },
+  {
+    "path": "api/user.php",
+    "size": 1941,
+    "hash": "b19aabf90cba958e90ccd997ecc5bf3441c51aace135612e40e4059c18ba6903",
+    "status": "OK",
+    "method": "Context Scan (Line -1)",
+    "confidence": 0.83
+  },
+  {
+    "path": "api/chat.php",
+    "size": 1101,
+    "hash": "9b0413c1f6f7e5aa0d486d241071ac6a460784807062ae614fa7d59177e48bc9",
+    "status": "OK",
+    "method": "Context Scan (Line -1)",
+    "confidence": 0.83
+  },
+  {
+    "path": "api/system.php",
+    "size": 609,
+    "hash": "bd4d33675a24e01411509ee040aa7e6761a6a9ef3e964e0aa876cd47a846049c",
+    "status": "OK",
+    "method": "Context Scan (Line -1)",
+    "confidence": 0.83
+  },
+  {
+    "path": "index.php",
+    "size": 3118,
+    "hash": "6994b4178ad272c0c04cba0d785c875042e5e808b897874054ae32d4e874bbf9",
+    "status": "OK",
+    "method": "Context Scan (Line -1)",
+    "confidence": 0.83
+  },
+  {
+    "path": "views/login.php",
+    "size": 223,
+    "hash": "66cfbdc7ce460de8e7665cb8afaef93e6b771ecb4566deeb7643e7f90e2c2730",
+    "status": "OK",
+    "method": "Context Scan (Line -1)",
+    "confidence": 0.83
+  },
+  {
+    "path": "views/home.php",
+    "size": 763,
+    "hash": "ff9417cad81f4dfd49773803df3707090d10d90b095c295f486fd0db1d1b46dc",
+    "status": "OK",
+    "method": "Context Scan (Line -1)",
+    "confidence": 0.83
+  },
+  {
+    "path": "views/map.php",
+    "size": 97,
+    "hash": "b0d993f862232072bebda996efe8d0682ee759a8624758d44bc80e27c08bf034",
+    "status": "OK",
+    "method": "Context Scan (Line -1)",
+    "confidence": 0.83
+  },
+  {
+    "path": "views/chats.php",
+    "size": 693,
+    "hash": "e259b64b6a644a62e22ce1deed294c320e136d9dbb1d719545f7bb40f7bdabd1",
+    "status": "OK",
+    "method": "Context Scan (Line -1)",
+    "confidence": 0.83
+  },
+  {
+    "path": "views/logs.php",
+    "size": 583,
+    "hash": "7dbccc6e12fa943cbb637d75120eb621c0b974a8fcdb9bacff92581a86caa8e5",
+    "status": "OK",
+    "method": "Context Scan (Line -1)",
+    "confidence": 0.83
+  },
+  {
+    "path": "js/state.js",
+    "size": 589,
+    "hash": "21e835f6e888da21d9e84fc74f21cda3c020fe1c22d9b5d86a506d76e699837e",
+    "status": "OK",
+    "method": "Context Scan (Line -1)",
+    "confidence": 0.83
+  },
+  {
+    "path": "js/profile.js",
+    "size": 1438,
+    "hash": "758d6744245db48da72873ff413ce8feb8d32491013617752124369212223035",
+    "status": "OK",
+    "method": "Context Scan (Line -1)",
+    "confidence": 0.83
+  },
+  {
+    "path": "js/map.js",
+    "size": 1353,
+    "hash": "4729ecfb8c8c5e2027151040d5a8bbe3c103cbc8ff468e0ad2283c1c8886f05c",
+    "status": "OK",
+    "method": "Context Scan (Line -1)",
+    "confidence": 0.83
+  },
+  {
+    "path": "js/chat.js",
+    "size": 3920,
+    "hash": "410d4e706524857cd8aea4c1d1ef74ecd5355df8ee89154fac363f671d5b3a6b",
+    "status": "OK",
+    "method": "Context Scan (Line -1)",
+    "confidence": 0.83
+  },
+  {
+    "path": "js/logs.js",
+    "size": 457,
+    "hash": "8c90be220fbc64add2990aaaa33cdb8a84d33eab50aca3546ebc193548a935d5",
+    "status": "OK",
+    "method": "Context Scan (Line -1)",
+    "confidence": 0.83
+  },
+  {
+    "path": "js/main.js",
+    "size": 780,
+    "hash": "e17efab30c5a09b675bee83656d6403bf1e0bed0ec20a4aa5aacd2198c268f4d",
+    "status": "OK",
+    "method": "Context Scan (Line -1)",
+    "confidence": 0.83
+  }
+]
