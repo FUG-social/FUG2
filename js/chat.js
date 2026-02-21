@@ -19,11 +19,22 @@ const Chat = {
         document.getElementById('chat-list').classList.add('hidden');
         document.getElementById('chat-room').classList.remove('hidden');
         
-        // Force navigate to Chat tab (useful if opened via Map)
+        // Force navigate to Chat tab
         document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
         document.getElementById('view-chats').classList.add('active');
         document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
         
+        // CSR CACHE: Instantly load history from LocalStorage
+        const area = document.getElementById('chat-messages');
+        area.innerHTML = ''; // Clear prior view context
+        
+        const cacheKey = `fug_chat_${State.userId}_${State.activeChatId}`;
+        const cachedData = JSON.parse(localStorage.getItem(cacheKey) || '[]');
+        
+        if (cachedData.length > 0) {
+            Chat.renderMessagesToDOM(cachedData, area, true);
+        }
+
         if (Chat.pollInterval) clearInterval(Chat.pollInterval);
         Chat.pollInterval = setInterval(Chat.loadMessages, 1500);
         Chat.loadMessages();
@@ -38,21 +49,53 @@ const Chat = {
     
     loadMessages: async () => {
         if (!State.activeChatId) return;
+        
         const res = await State.api('get_messages', { other_user_id: State.activeChatId });
         if (res.status === 'success') {
             const area = document.getElementById('chat-messages');
-            const html = res.data.map(m => `
-                <div class="msg-bubble ${m.sender_id == State.userId ? 'msg-sent' : 'msg-received'}">
-                    ${m.body}
-                </div>
-            `).join('');
+            const cacheKey = `fug_chat_${State.userId}_${State.activeChatId}`;
+            let cachedData = JSON.parse(localStorage.getItem(cacheKey) || '[]');
             
-            // Prevent blinking/unnecessary rendering
-            if (area.innerHTML.replace(/\s+/g, '') !== html.replace(/\s+/g, '')) {
-                const atBottom = area.scrollHeight - area.scrollTop <= area.clientHeight + 50;
-                area.innerHTML = html;
-                if (atBottom || area.innerHTML === '') area.scrollTop = area.scrollHeight;
+            const newMessages = [];
+            const serverMessages = res.data;
+            const cachedIds = new Set(cachedData.map(m => m.id));
+            
+            // Check for messages the server has that aren't in local storage yet
+            serverMessages.forEach(msg => {
+                if (!cachedIds.has(msg.id)) {
+                    newMessages.push(msg);
+                    cachedData.push(msg);
+                }
+            });
+            
+            if (newMessages.length > 0) {
+                // Ensure array order integrity
+                cachedData.sort((a, b) => parseInt(a.id) - parseInt(b.id));
+                // Cap localStorage size so browser doesn't choke over time
+                if (cachedData.length > 200) cachedData = cachedData.slice(-200);
+                
+                localStorage.setItem(cacheKey, JSON.stringify(cachedData));
+                
+                // Only inject the NEW DOM nodes (No flickering)
+                Chat.renderMessagesToDOM(newMessages, area, false);
             }
+        }
+    },
+
+    // Helper CSR logic to inject nodes safely 
+    renderMessagesToDOM: (messages, container, isFullLoad) => {
+        const atBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50;
+        
+        messages.forEach(m => {
+            const div = document.createElement('div');
+            div.className = `msg-bubble ${m.sender_id == State.userId ? 'msg-sent' : 'msg-received'}`;
+            div.innerText = m.body; // innerText inherently blocks XSS injections
+            container.appendChild(div);
+        });
+
+        // Smart auto-scroll logic
+        if (atBottom || isFullLoad || container.innerHTML === '') {
+            container.scrollTop = container.scrollHeight;
         }
     },
     
@@ -63,7 +106,7 @@ const Chat = {
         
         input.value = '';
         await State.api('send_message', { receiver_id: State.activeChatId, body });
-        Chat.loadMessages(); // immediate load
+        Chat.loadMessages(); // Force immediate refresh
     },
     
     startUnreadPolling: () => {

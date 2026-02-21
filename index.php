@@ -25,7 +25,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         exit;
     }
 }
+
 $isLoggedIn = isset($_SESSION['user_id']);
+
+// SECURE API KEY GENERATION: Create a session-bound key for the API Obfuscation
+if ($isLoggedIn && empty($_SESSION['api_key'])) {
+    $_SESSION['api_key'] = bin2hex(random_bytes(16)); 
+}
 ?>
 <!DOCTYPE html>
 <html>
@@ -33,7 +39,7 @@ $isLoggedIn = isset($_SESSION['user_id']);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FUG - Minimal</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <style>
         body { font-family: sans-serif; margin: 15px; }
         .hidden { display: none !important; }
@@ -52,6 +58,7 @@ $isLoggedIn = isset($_SESSION['user_id']);
 <body>
     <?php if (!$isLoggedIn): include 'views/login.php'; else: ?>
         <meta name="current-user-id" content="<?= $_SESSION['user_id'] ?>">
+        <meta name="api-key" content="<?= $_SESSION['api_key'] ?>">
         
         <nav>
             <button class="nav-btn" data-target="view-home">Home</button>
@@ -68,7 +75,7 @@ $isLoggedIn = isset($_SESSION['user_id']);
             include 'views/logs.php'; 
         ?>
 
-        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
         <script src="js/state.js"></script>
         <script src="js/profile.js"></script>
         <script src="js/map.js"></script>
