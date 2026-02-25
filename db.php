@@ -1,5 +1,5 @@
 <?php
-// db.php - Fixed: Forces Text Mode for Stability & V3 Tables
+// db.php - V2 Architecture: Turso Identity Bridge & Schema
 require_once 'config.php';
 require_once 'logger.php';
 
@@ -19,9 +19,6 @@ class TursoDB {
         
         $args = [];
         foreach ($params as $param) {
-            // FIX: Send EVERYTHING as text. 
-            // SQLite is weakly typed and handles "1" (text) into INTEGER columns perfectly.
-            // This fixes the mismatch where PHP sends Int but DB has Text.
             if (is_null($param)) {
                 $args[] = ['type' => 'null', 'value' => null];
             } else {
@@ -60,8 +57,6 @@ class TursoDB {
             return false;
         }
 
-        // FIX: Only call curl_close if it's a legacy resource (PHP 7). 
-        // In PHP 8+, it's an object and cleans itself up, avoiding the deprecation warning.
         if (is_resource($ch)) {
             curl_close($ch);
         }
@@ -73,7 +68,6 @@ class TursoDB {
 
         $data = json_decode($response, true);
         
-        // Check for SQL errors in the response body
         $resultItem = $data['results'][0] ?? null;
         if ($resultItem && isset($resultItem['type']) && $resultItem['type'] === 'error') {
             $this->logger->database('ERROR', 'SQL Error', ['sql' => $sql, 'err' => $resultItem['error']]);
@@ -81,7 +75,7 @@ class TursoDB {
         }
 
         if (!$data || !isset($resultItem['response']['result'])) {
-            return []; // No results (e.g. INSERT/UPDATE success)
+            return []; 
         }
 
         $result = $resultItem['response']['result'];
@@ -103,46 +97,41 @@ class TursoDB {
     }
 
     public function autoSetup() {
-        // We use a file check to prevent running CREATE TABLE on every request (Performance)
-        if (!file_exists(__DIR__ . '/setup_v3.lock')) {
+        // V2 Update: Lock file updated to setup_v4
+        if (!file_exists(__DIR__ . '/setup_v4.lock')) {
             
-            // 1. Create Users Table (V3)
-            $this->query("CREATE TABLE IF NOT EXISTS users_v3 (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+            // 1. Create Identity Bridge Table (Replaces users_v3)
+            $this->query("CREATE TABLE IF NOT EXISTS user_identity_v1 (
+                auth0_sub TEXT PRIMARY KEY,
                 email TEXT UNIQUE,
-                name TEXT,
-                lat REAL,
-                lng REAL,
-                activity TEXT DEFAULT '',
-                interests TEXT DEFAULT '',
-                last_active DATETIME DEFAULT CURRENT_TIMESTAMP
+                internal_id TEXT UNIQUE,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )");
+            $this->query("CREATE INDEX IF NOT EXISTS idx_internal_id ON user_identity_v1(internal_id)");
 
-            // 2. Create Messages Table (V3)
-            $this->query("CREATE TABLE IF NOT EXISTS messages_v3 (
+            // 2. Create Messages Table with Alphanumeric TEXT IDs
+            $this->query("CREATE TABLE IF NOT EXISTS messages_v4 (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                sender_id INTEGER,
-                receiver_id INTEGER,
+                room_id TEXT,
+                sender_id TEXT,
+                receiver_id TEXT,
                 body TEXT,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )");
+            $this->query("CREATE INDEX IF NOT EXISTS idx_msg_v4_room ON messages_v4(room_id)");
 
-            // 3. Create Indexes
-            $this->query("CREATE INDEX IF NOT EXISTS idx_msg_v3_sender ON messages_v3(sender_id)");
-            $this->query("CREATE INDEX IF NOT EXISTS idx_msg_v3_receiver ON messages_v3(receiver_id)");
-
-            // 4. Seed Default Users
-            $users = $this->query("SELECT id FROM users_v3 LIMIT 1");
+            // 3. Seed Default Users with new 6-char IDs
+            $users = $this->query("SELECT internal_id FROM user_identity_v1 LIMIT 1");
             if (empty($users)) {
-                $this->query("INSERT INTO users_v3 (email, name, lat, lng, activity, interests) VALUES (?, ?, ?, ?, ?, ?)",
-                    ['umer@hamaaz.com', 'Umer', DEFAULT_LAT, DEFAULT_LNG, 'Looking for a cricket match', 'Cricket, Badminton, Coffee']
+                $this->query("INSERT INTO user_identity_v1 (auth0_sub, email, internal_id) VALUES (?, ?, ?)",
+                    ['mock|admin1', 'umer@hamaaz.com', 'af1012']
                 );
-                $this->query("INSERT INTO users_v3 (email, name, lat, lng, activity, interests) VALUES (?, ?, ?, ?, ?, ?)",
-                    ['saad@saad.com', 'Saad', DEFAULT_LAT + 0.001, DEFAULT_LNG + 0.001, 'Free for gym session', 'Gym, Cricket, Running']
+                $this->query("INSERT INTO user_identity_v1 (auth0_sub, email, internal_id) VALUES (?, ?, ?)",
+                    ['mock|admin2', 'saad@saad.com', 'bc9999']
                 );
             }
 
-            file_put_contents(__DIR__ . '/setup_v3.lock', 'done');
+            file_put_contents(__DIR__ . '/setup_v4.lock', 'done');
         }
     }
 }

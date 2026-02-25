@@ -1,5 +1,15 @@
-document.addEventListener('DOMContentLoaded', () => {
+// js/main.js
+
+document.addEventListener('DOMContentLoaded', async () => {
     if (!State.userId) return; // Ignore if on login page
+
+    // INITIALIZE INDEXED_DB FIRST
+    try {
+        await LocalDB.init();
+        console.log("IndexedDB Initialized successfully");
+    } catch (e) {
+        console.error("Failed to initialize IndexedDB", e);
+    }
 
     // Tab Navigation Logic
     document.querySelectorAll('.nav-btn').forEach(btn => {

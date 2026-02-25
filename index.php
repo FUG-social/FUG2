@@ -1,20 +1,36 @@
 <?php
-ob_start(); // FIX: Output Buffering prevents visual errors from breaking session headers
+ob_start(); 
 session_start();
 require_once 'db.php';
 $db = new TursoDB();
 $db->autoSetup();
 
-// Authentication Handling
+// ID Generator for V2 Architecture
+function generateInternalId() {
+    return substr(str_shuffle("abcdefghijklmnopqrstuvwxyz0123456789"), 0, 6);
+}
+
+// Authentication Handling (Mocking Auth0 for Phase 1)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     if ($_POST['action'] === 'login') {
-        $email = $_POST['email'] ?? '';
-        $users = $db->query("SELECT * FROM users_v3 WHERE email = ? LIMIT 1", [$email]);
-        if (!empty($users)) {
-            $_SESSION['user_id'] = $users[0]['id'];
-            $_SESSION['user_name'] = $users[0]['name'];
-            $_SESSION['user_activity'] = $users[0]['activity'] ?? '';
-            $_SESSION['user_interests'] = $users[0]['interests'] ?? '';
+        $email = trim($_POST['email'] ?? '');
+        if ($email) {
+            $users = $db->query("SELECT * FROM user_identity_v1 WHERE email = ? LIMIT 1", [$email]);
+            
+            if (empty($users)) {
+                // New User: Generate 6-char ID and Mock Auth0 Sub
+                $internalId = generateInternalId();
+                $auth0Sub = 'mock|' . bin2hex(random_bytes(8)); 
+                $db->query("INSERT INTO user_identity_v1 (auth0_sub, email, internal_id) VALUES (?, ?, ?)", 
+                    [$auth0Sub, $email, $internalId]
+                );
+                $_SESSION['user_id'] = $internalId;
+            } else {
+                // Existing User
+                $_SESSION['user_id'] = $users[0]['internal_id'];
+            }
+            
+            $_SESSION['user_name'] = explode('@', $email)[0]; // Fallback name for now
             session_regenerate_id(true);
         }
         header("Location: index.php"); 
@@ -28,7 +44,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
 $isLoggedIn = isset($_SESSION['user_id']);
 
-// SECURE API KEY GENERATION: Create a session-bound key for the API Obfuscation
 if ($isLoggedIn && empty($_SESSION['api_key'])) {
     $_SESSION['api_key'] = bin2hex(random_bytes(16)); 
 }
@@ -38,7 +53,7 @@ if ($isLoggedIn && empty($_SESSION['api_key'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FUG - Minimal</title>
+    <title>FUG - V2 Build</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <style>
         body { font-family: sans-serif; margin: 15px; }
@@ -57,6 +72,7 @@ if ($isLoggedIn && empty($_SESSION['api_key'])) {
 </head>
 <body>
     <?php if (!$isLoggedIn): include 'views/login.php'; else: ?>
+        <!-- Note: current-user-id is now a 6-char string like 'af1012' -->
         <meta name="current-user-id" content="<?= $_SESSION['user_id'] ?>">
         <meta name="api-key" content="<?= $_SESSION['api_key'] ?>">
         
