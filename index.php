@@ -31,6 +31,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             }
             
             $_SESSION['user_name'] = explode('@', $email)[0]; // Fallback name for now
+
+            // FIX: Read profile from dynamic.json to restore UI state on login
+            $p1 = $_SESSION['user_id'][0] ?? '0';
+            $p2 = $_SESSION['user_id'][1] ?? '0';
+            $dynamicFile = __DIR__ . "/users/$p1/$p2/{$_SESSION['user_id']}/dynamic.json";
+            
+            if (file_exists($dynamicFile)) {
+                $dyn = json_decode(file_get_contents($dynamicFile), true);
+                $_SESSION['user_activity'] = $dyn['activity'] ?? '';
+                if (isset($dyn['interests']) && is_array($dyn['interests'])) {
+                    $flat = array_merge($dyn['interests']['core'] ?? [], $dyn['interests']['craft'] ?? [], $dyn['interests']['orbit'] ?? []);
+                    $_SESSION['user_interests'] = implode(', ', $flat);
+                }
+            }
+
             session_regenerate_id(true);
         }
         header("Location: index.php"); 

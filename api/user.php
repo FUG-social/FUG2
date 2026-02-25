@@ -1,5 +1,5 @@
 <?php
-// api/user.php - Phase 3: JSONL Radar Engine
+// api/user.php - Phase 3: JSONL Radar Engine (with Match Fixes)
 
 checkAuth();
 $userId = $_SESSION['user_id']; 
@@ -77,6 +77,15 @@ if ($action === 'update_location') {
     $dynamicData['last_seen_timestamp'] = time();
     file_put_contents($dynamicFile, json_encode($dynamicData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 
+    // FIX: Flatten interests from JSON safely to ensure radar matches don't break
+    $flatInterests = '';
+    if (isset($dynamicData['interests']) && is_array($dynamicData['interests'])) {
+        $flat = array_merge($dynamicData['interests']['core'] ?? [], $dynamicData['interests']['craft'] ?? [], $dynamicData['interests']['orbit'] ?? []);
+        $flatInterests = implode(', ', $flat);
+    } else {
+        $flatInterests = $_SESSION['user_interests'] ?? '';
+    }
+
     // 2. Append to Radar Shard (O(1) operation)
     $shard = $userId[0] ?? '0'; 
     $radarDir = __DIR__ . "/../radar/$country/$city";
@@ -89,11 +98,10 @@ if ($action === 'update_location') {
         'name' => $_SESSION['user_name'] ?? 'User',
         'lat' => $fuzzLat,
         'lng' => $fuzzLng,
-        'interests' => $_SESSION['user_interests'] ?? '', 
+        'interests' => $flatInterests, // Restored matching capability
         'time' => time()
     ];
     
-    // Append a single JSON line to the live shard. Zero database lag.
     file_put_contents("$radarDir/$shard-live.jsonl", json_encode($pingData) . "\n", FILE_APPEND | LOCK_EX);
 
     echo json_encode(['status' => 'success']);
@@ -111,21 +119,25 @@ if ($action === 'get_users') {
     $activeUsers = [];
     $now = time();
     
-    $myInterests = array_map('trim', explode(',', strtolower($_SESSION['user_interests'] ?? '')));
-    $myInterests = array_filter($myInterests);
+    // FIX: Read user's own interests from file to guarantee it exists even on refresh
+    $dynamicData = file_exists($dynamicFile) ? json_decode(file_get_contents($dynamicFile), true) : [];
+    $myInterestsArray = [];
+    if (isset($dynamicData['interests']) && is_array($dynamicData['interests'])) {
+        $myInterestsArray = array_merge($dynamicData['interests']['core'] ?? [], $dynamicData['interests']['craft'] ?? [], $dynamicData['interests']['orbit'] ?? []);
+    } else {
+        $myInterestsArray = explode(',', $_SESSION['user_interests'] ?? '');
+    }
+    $myInterests = array_filter(array_map('trim', array_map('strtolower', $myInterestsArray)));
 
     // Read all shards in the user's city
     if (is_dir($radarDir)) {
         $files = glob("$radarDir/*-live.jsonl");
         foreach ($files as $file) {
-            // Read file line by line
             $lines = file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
             foreach ($lines as $line) {
                 $data = json_decode($line, true);
-                if ($data && ($now - $data['time'] <= 300)) { // Only users active in last 5 mins
+                if ($data && ($now - $data['time'] <= 300)) { 
                     if ($data['id'] === $userId) continue; 
-                    
-                    // Overwrites duplicates, keeping only the latest ping for a user ID
                     $activeUsers[$data['id']] = $data;
                 }
             }
